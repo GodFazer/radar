@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Data</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        /* Контейнер для форми та списку конфігурації */
+        .container {
+            position: relative; /* Відносне позиціонування для контейнера */
+        }
+        .form-container {
+            width: 45%; /* Ширина форми */
+        }
+
+        /* Форми та список будуть займати певне місце */
+        .config-container {
+            width: 300px; /* Кожен елемент займе 45% ширини */
+            position: absolute; /* Абсолютне позиціонування */
+            top: 0; /* Прижимаємо до верху форми */
+            left: 320px; /* Розташовуємо список на невеликій відстані від форми */
+        }
+
+        /* Можна додати відступи для елементів всередині форми та списку */
+        form label, form input, form button {
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        /* Для списку можна додати стилі */
+        ul {
+            list-style-type: none; /* Прибираємо маркери */
+            padding: 0;
+        }
+
+        /* Стилізуємо графік */
+        #graph {
+            width: 70%; /* Ширина графіка */
+            margin: auto; /* Центруємо графік */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="form-container">
+            <h2>Конфігурація</h2>
+            <form id="config-form">
+                <label for="measurementsPerRotation">Measurements Per Rotation:</label>
+                <input type="number" id="measurementsPerRotation" required>
+                <label for="rotationSpeed">Rotation Speed:</label>
+                <input type="number" id="rotationSpeed" required>
+                <label for="targetSpeed">Target Speed:</label>
+                <input type="number" id="targetSpeed" required>
+                <button type="submit">Відправити конфігурацію</button>
+            </form>
+            <div id="response"></div>
+        </div>
+        <div class="config-container">
+            <h3>Конфігурація:</h3>
+            <ul id="config-list"></ul>
+        </div>
+        <div id="graph"></div>
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            // Запит на отримання конфігурації
+            $.post('/get-config', function(data) {
+                $('#measurementsPerRotation').val(data.measurementsPerRotation);
+                $('#rotationSpeed').val(data.rotationSpeed);
+                $('#targetSpeed').val(data.targetSpeed);
+            });
+
+            // Обробка події на формі
+            $('#config-form').submit(function(event) {
+                event.preventDefault(); // Скасовуємо стандартну поведінку форми
+
+                const configData = {
+                    measurementsPerRotation: $('#measurementsPerRotation').val(),
+                    rotationSpeed: $('#rotationSpeed').val(),
+                    targetSpeed: $('#targetSpeed').val()
+                };
+
+                // Відправка конфігурації на сервер
+                $.ajax({
+                    url: '/send-config',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(configData),
+                    success: function(response) {
+                        $('#response').html(`<p>${response.response}</p>`);
+                        updateConfigList(response.updated_config);
+                    },
+                    error: function(error) {
+                        $('#response').html('<p>Помилка: не вдалося відправити конфігурацію.</p>');
+                    }
+                });
+            });
+
+            // Функція для оновлення списку конфігурацій
+            function updateConfigList(config) {
+                const list = $('#config-list');
+                list.empty();
+                for (const key in config) {
+                    list.append(`<li>${key}: ${config[key]}</li>`);
+                }
+            }
+
+            // Функція для отримання даних для графіка
+            function fetchGraphData() {
+                $.get('/graph-data', function(data) {
+                    if (data.error) {
+                        console.error(data.error);
+                    } else {
+                        const graphData = JSON.parse(data);
+                        const graphElement = document.getElementById('graph');
+                        Plotly.newPlot(graphElement, graphData.data, graphData.layout);
+                    }
+                });
+            }
+
+            // Регулярне оновлення графіка
+            setInterval(fetchGraphData, 5000); // Оновлюємо кожні 5 секунд
+        });
+    </script>
+</body>
+</html>
